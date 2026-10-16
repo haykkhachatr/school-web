@@ -1200,3 +1200,35 @@ button.topbar__logo:hover { background:#246071; }
   .map-caption { display:none; }
  }
 }
+
+/* Permanent desktop filters, with the mobile drawer retained. */
+@media screen and (min-width:881px) {
+ .sidebar,.sidebar.open,.filters-collapsed .sidebar,.details-open .sidebar { position:relative; inset:auto; display:block; flex:0 0 280px; width:280px; height:auto; min-height:0; max-height:none; visibility:visible; transform:none; border-radius:0; border:0; border-right:1px solid var(--border); box-shadow:none; z-index:400; transition:none; }
+ .sidebar__scroll { position:absolute; inset:0; height:100%; }
+ #sidebarClose,#filtersToggle,.sidebar-backdrop,.sidebar-backdrop.show { display:none; }
+ .presentation-mode .sidebar { display:none; }
+ .workspace-toolbar { flex-wrap:wrap; }
+}
+.workspace { position:relative; }
+.view-transition { position:absolute; inset:65px 0 0; z-index:1200; display:grid; place-items:center; pointer-events:none; background:color-mix(in srgb,var(--surface-1) 94%,transparent); animation:school-overlay .7s ease both; }
+.school-build { width:220px; color:var(--accent); text-align:center; }
+.school-build svg { width:220px; height:165px; overflow:visible; }
+.school-build svg path { stroke:currentColor; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+.build-foundation,.build-walls,.build-roof,.build-windows,.build-door,.build-flag { transform-box:fill-box; transform-origin:center bottom; animation:school-piece .24s ease-out both; }
+.build-foundation { animation-delay:0s; }
+.build-walls { animation-delay:.08s; fill:var(--accent-soft); }
+.build-roof { animation-delay:.17s; fill:var(--accent-soft); }
+.build-windows { animation-delay:.26s; }
+.build-door { animation-delay:.31s; }
+.build-flag { animation-delay:.36s; }
+.school-build > span { display:block; font-size:14px; color:var(--text-secondary); margin-top:8px; }
+.build-progress { height:3px; background:var(--accent); border-radius:4px; margin:18px auto 0; width:100px; transform-origin:left; animation:school-progress .6s ease-out both; }
+.school-details { border-top:3px solid var(--accent); }
+.details-top { background:var(--surface-2); }
+@keyframes school-piece { from { opacity:0; transform:translateY(12px) scaleY(.8); } to { opacity:1; transform:none; } }
+@keyframes school-progress { from { transform:scaleX(0); } to { transform:scaleX(1); } }
+@keyframes school-overlay { 0% { opacity:0; } 12%,78% { opacity:1; } 100% { opacity:0; } }
+@keyframes school-panel-enter { from { opacity:0; transform:translateX(24px) scale(.98); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion:no-preference) { .school-details:not([hidden]) { animation:school-panel-enter .32s cubic-bezier(.2,.8,.2,1) both; } }
+@media (prefers-reduced-motion:reduce) { .view-transition { display:none !important; } }
+@media print { .view-transition { display:none !important; } }

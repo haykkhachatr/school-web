@@ -478,7 +478,21 @@
     document.getElementById('portfolioOverview').innerHTML = items.length ? `<div class="portfolio-track" aria-hidden="true">${distribution.filter(row => row.count).map(row => `<span style="flex:${row.count};background:${statusColorRaw(row.status)}"></span>`).join('')}</div><div class="portfolio-legend">${distribution.map(row => `<span><i style="background:${statusColorRaw(row.status)}" aria-hidden="true"></i>${escapeHtml(STATUS_LABELS[row.status] || row.status)}<b>${fmt.format(row.count)}</b><small>${Math.round(row.count / items.length * 100)}%</small></span>`).join('')}</div>` : '<p class="insight-note">Ընտրված զտիչներով դպրոցներ չկան։</p>';
   }
   /* ---------- Utils ---------- */
+  let activeView = 'map';
+  let transitionTimer;
   function showView(view) {
+    if (view !== activeView) {
+      const overlay = document.getElementById('viewTransition');
+      clearTimeout(transitionTimer);
+      overlay.hidden = true;
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        // Restart a short decorative transition; navigation is never delayed.
+        void overlay.offsetWidth;
+        overlay.hidden = false;
+        transitionTimer = setTimeout(() => { overlay.hidden = true; }, 700);
+      }
+      activeView = view;
+    }
     document.getElementById('mapPanel').hidden = view !== 'map';
     document.getElementById('listPanel').hidden = view !== 'list';
     document.getElementById('analysisPanel').hidden = view !== 'analysis';
@@ -607,6 +621,10 @@
         <div><dt>Կադաստրային ծածկագիր</dt><dd>${text(f.cadastre)}</dd></div>
       </dl><p class="details-disclaimer">Աղբյուր՝ schools.geojson։ Զրոները ցուցադրված են ինչպես բազայում․ դրանց լրացվածությունը պետք է ստուգել աղբյուրի հետ։ Թարմացման ամսաթիվը նշված չէ։</p>`;
     document.getElementById('schoolDetails').hidden = false;
+    const content = document.getElementById('detailsContent');
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && content.animate) {
+      content.animate([{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 280, easing: 'ease-out' });
+    }
     root.classList.add('details-open');
     polygonById.forEach((group, key) => group.setStyle({ weight: key === selectedSchoolId ? 3 : 2, fillOpacity: key === selectedSchoolId ? .34 : .20 }));
     if (focus) document.getElementById('detailsClose').focus();
