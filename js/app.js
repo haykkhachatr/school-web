@@ -24,11 +24,11 @@
   const sidebar = document.getElementById('sidebar');
   const sidebarBackdrop = document.getElementById('sidebarBackdrop');
   const sidebarToggle = document.getElementById('sidebarToggle');
-  function openSidebar() { sidebar.classList.add('open'); sidebarBackdrop.classList.add('show'); sidebarToggle.setAttribute('aria-expanded', 'true'); document.getElementById('sidebarClose').focus(); }
-  function closeSidebar() { sidebar.classList.remove('open'); sidebarBackdrop.classList.remove('show'); sidebarToggle.setAttribute('aria-expanded', 'false'); }
+  function openSidebar() { sidebar.classList.add('open'); sidebarBackdrop.classList.add('show'); sidebarToggle.setAttribute('aria-expanded', 'true'); document.getElementById('filtersToggle').setAttribute('aria-expanded', 'true'); document.getElementById('sidebarClose').focus(); }
+  function closeSidebar() { sidebar.classList.remove('open'); sidebarBackdrop.classList.remove('show'); sidebarToggle.setAttribute('aria-expanded', 'false'); document.getElementById('filtersToggle').setAttribute('aria-expanded', 'false'); }
   sidebarToggle.addEventListener('click', () => sidebar.classList.contains('open') ? closeSidebar() : openSidebar());
   sidebarBackdrop.addEventListener('click', closeSidebar);
-  document.getElementById('sidebarClose').addEventListener('click', () => { closeSidebar(); sidebarToggle.focus(); });
+  document.getElementById('sidebarClose').addEventListener('click', () => { closeSidebar(); document.getElementById('filtersToggle').focus(); });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (!document.getElementById('schoolDetails').hidden) closeDetails();
@@ -732,6 +732,12 @@
   }
 
   function bindWorkspace() {
+    document.getElementById('filtersToggle').setAttribute('aria-expanded', 'false');
+    document.getElementById('overviewToggle').addEventListener('click', () => {
+      const expanded = root.classList.toggle('overview-open');
+      document.getElementById('overviewToggle').setAttribute('aria-expanded', String(expanded));
+      requestAnimationFrame(() => map.invalidateSize());
+    });
     document.getElementById('activeFilters').addEventListener('click', event => {
       const button = event.target.closest('[data-filter-key]');
       if (!button) return;
@@ -757,10 +763,7 @@
     document.getElementById('printSummary').addEventListener('click', () => { buildPrintReport(); window.print(); });
     window.addEventListener('beforeprint', buildPrintReport);
     document.getElementById('filtersToggle').addEventListener('click', () => {
-      if (window.matchMedia('(max-width: 880px)').matches) { openSidebar(); return; }
-      const collapsed = root.classList.toggle('filters-collapsed');
-      document.getElementById('filtersToggle').setAttribute('aria-expanded', String(!collapsed));
-      requestAnimationFrame(() => map.invalidateSize());
+      if (sidebar.classList.contains('open')) closeSidebar(); else openSidebar();
     });
     document.getElementById('analysisContent').addEventListener('click', event => {
       const button = event.target.closest('[data-status], [data-province]');
