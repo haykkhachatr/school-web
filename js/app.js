@@ -489,7 +489,7 @@
         // Restart a short decorative transition; navigation is never delayed.
         void overlay.offsetWidth;
         overlay.hidden = false;
-        transitionTimer = setTimeout(() => { overlay.hidden = true; }, 700);
+        transitionTimer = setTimeout(() => { overlay.hidden = true; }, 1100);
       }
       activeView = view;
     }
