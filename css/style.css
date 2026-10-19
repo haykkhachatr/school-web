@@ -1179,8 +1179,8 @@ button.topbar__logo:hover { background:#246071; }
   .stat-tile,.stat-tile:nth-child(3),.stat-tile--wide { padding:9px 10px; border-bottom:0; }
   .stat-tile:nth-child(2) { border-right:1px solid var(--border); }
   .stat-tile__body { display:block; flex:1; min-width:0; align-self:flex-start; }
-  .stat-tile__value { font-size:25px; }
-  .stat-tile__label { font-size:11px; margin-top:3px; }
+  .stat-tile__value,.presentation-mode .stat-tile__value { font-size:25px; }
+  .stat-tile__label,.presentation-mode .stat-tile__label { font-size:11px; margin-top:3px; }
   .stat-context { display:none; }
   .workspace-toolbar { padding:7px 10px; gap:4px 10px; }
   .view-switch { width:auto; flex:1; }
@@ -1194,8 +1194,8 @@ button.topbar__logo:hover { background:#246071; }
   .topbar__brand { flex:1 0 100%; }
   .topbar__actions { width:100%; justify-content:space-between; }
   .topbar__logo { width:32px; height:32px; }
-  .stat-tile__value { font-size:22px; }
-  .stat-tile__label { font-size:10px; }
+  .stat-tile__value,.presentation-mode .stat-tile__value { font-size:22px; }
+  .stat-tile__label,.presentation-mode .stat-tile__label { font-size:10px; }
   .view-switch { width:100%; flex:auto; }
   .workspace-toolbar .text-btn { min-height:36px; font-size:13px; }
   .map-caption { display:none; }
