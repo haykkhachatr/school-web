@@ -1177,7 +1177,8 @@ button.topbar__logo:hover { background:#246071; }
   .utility-btn { padding:6px 9px; font-size:12px; }
   .stats { grid-template-columns:repeat(4,minmax(0,1fr)); }
   .stat-tile,.stat-tile:nth-child(3),.stat-tile--wide { padding:9px 10px; border-bottom:0; }
-  .stat-tile__body { display:block; }
+  .stat-tile:nth-child(2) { border-right:1px solid var(--border); }
+  .stat-tile__body { display:block; flex:1; min-width:0; align-self:flex-start; }
   .stat-tile__value { font-size:25px; }
   .stat-tile__label { font-size:11px; margin-top:3px; }
   .stat-context { display:none; }
