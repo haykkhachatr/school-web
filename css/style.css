@@ -1260,3 +1260,113 @@ button.topbar__logo:hover { background:#246071; }
 @keyframes worker-step { from { transform:skewX(-12deg); } to { transform:skewX(12deg); } }
 @keyframes worker-lay { from { transform:rotate(-12deg); } to { transform:rotate(12deg); } }
 @keyframes worker-hammer { from { transform:rotate(18deg); } to { transform:rotate(-16deg); } }
+
+/* =========================================================
+   Design refresh (Oct 2026) - appended as a final layer; earlier layers are unchanged.
+   Phone header menu, welcome strip, stat tiles, toolbar, map labels and clusters,
+   list-card thumbnails, details-panel fixes. The previous design is tagged v1-pre-redesign.
+   ========================================================= */
+.sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; border:0; }
+.no-data { color:var(--text-muted); font-weight:500; }
+
+/* --- Header: secondary actions sit in the header on desktop and behind a "..." button on phones --- */
+.topbar__menu { display:contents; }
+#menuToggle { display:none; }
+@media screen and (max-width:880px) {
+  .topbar { flex-wrap:wrap; }
+  .topbar__brand { flex:1 1 auto; min-width:0; }
+  .topbar__titles { min-width:0; }
+  .topbar__titles h1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar__actions { width:auto; flex:0 0 auto; margin-left:auto; justify-content:flex-end; gap:8px; }
+  #menuToggle { display:flex; }
+  .topbar__menu { display:none; position:absolute; top:calc(100% + 4px); right:12px; z-index:1700; flex-direction:column; gap:2px; min-width:240px; padding:6px; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-2); }
+  .topbar.menu-open { z-index:1700; }
+  .topbar.menu-open .topbar__menu { display:flex; }
+  .topbar__menu .utility-btn { width:100%; justify-content:flex-start; text-align:left; border:0; background:transparent; min-height:46px; padding:10px 14px; font-size:15px; border-radius:10px; }
+  .topbar__menu .utility-btn:hover, .topbar__menu .utility-btn:focus-visible { background:var(--accent-soft); }
+  /* In presentation mode the exit button must stay one tap away, so it moves back into the header. */
+  .presentation-mode .topbar__menu { display:contents; }
+  .presentation-mode #menuToggle, .presentation-mode #overviewToggle, .presentation-mode #printSummary { display:none; }
+  .presentation-mode .topbar__menu .utility-btn { width:auto; min-height:40px; padding:6px 12px; font-size:13px; border:1px solid var(--border); background:var(--surface-1); }
+  .presentation-mode .topbar__menu .utility-btn[aria-pressed="true"] { background:var(--accent); color:var(--accent-contrast); }
+}
+
+/* --- Welcome strip: roomy desktop screens only, dismissible, hidden in presentation / overview --- */
+.hero-strip { display:none; }
+@media screen and (min-width:881px) and (min-height:800px) {
+  .hero-strip { display:flex; align-items:center; gap:24px; flex-shrink:0; position:relative; overflow:hidden; isolation:isolate; min-height:68px; padding:12px 18px 12px 28px; color:#e6f1ef; background:linear-gradient(105deg,#112d3a 0%,#174650 62%,#1b5a5a 100%); border-bottom:1px solid var(--border); }
+  .hero-strip__art { position:absolute; z-index:-1; right:150px; top:-34px; width:200px; height:130px; color:#7dc1b7; opacity:.4; pointer-events:none; }
+  .hero-strip__text { display:flex; flex-direction:column; gap:2px; max-width:780px; }
+  .hero-strip__text strong { font-size:16px; font-weight:600; line-height:1.45; color:#fff; }
+  .hero-strip__text span { font-size:13px; line-height:1.5; color:#b9d4d1; }
+  .hero-strip__link { margin-left:auto; flex-shrink:0; min-height:40px; padding:8px 18px; border-radius:999px; border:1px solid #ffffff47; background:#ffffff1f; color:#fff; font:inherit; font-size:14px; cursor:pointer; transition:background .2s; }
+  .hero-strip__link:hover { background:#ffffff33; }
+  .hero-strip__close { flex-shrink:0; width:38px; height:38px; border:0; border-radius:50%; background:transparent; color:#c9dedb; font-size:26px; line-height:1; cursor:pointer; }
+  .hero-strip__close:hover { background:#ffffff1f; color:#fff; }
+}
+.hero-hidden .hero-strip, .presentation-mode .hero-strip, .overview-open .hero-strip { display:none; }
+
+/* --- Stat tiles: one consistent layout, a colour accent per tile, share bars under the status tiles --- */
+.stats .stat-tile { --tile-accent:var(--accent); }
+.stats .stat-tile:nth-child(2) { --tile-accent:var(--status-info); }
+.stats .stat-tile:nth-child(3) { --tile-accent:var(--status-good); }
+.stats .stat-tile:nth-child(4) { --tile-accent:var(--status-warning); }
+.stats .stat-tile::before { content:''; display:block; position:absolute; inset:0 0 auto 0; width:auto; height:3px; border-radius:0; background:var(--tile-accent); opacity:.85; }
+.stat-tile__body { flex:1; min-width:0; }
+.stat-bar { position:absolute; inset:auto 0 0 0; height:3px; background:var(--border); }
+.stat-bar > span { display:block; height:100%; width:0; background:var(--tile-accent); transition:width .6s var(--ease); }
+@media screen and (min-width:881px) {
+  .stat-tile__body { display:block; }
+  .stat-tile, .stat-tile:nth-child(3), .stat-tile--wide { padding:13px 24px 12px; }
+  .stat-tile__value { font-size:clamp(26px,2.2vw,32px); line-height:1.12; font-weight:600; }
+  .stat-tile__label { font-size:14px; font-weight:600; margin-top:2px; }
+  .stat-context { font-size:12px; line-height:1.4; margin-top:2px; }
+}
+@media screen and (min-width:521px) and (max-width:880px) { .stat-tile__label, .presentation-mode .stat-tile__label { font-size:12px; } }
+@media screen and (max-width:880px) { .stat-bar { display:none; } }
+
+/* --- Phone toolbar: view switch, filters and "show all" share one row; an idle summary line is hidden --- */
+.vs-short { display:none; }
+@media screen and (max-width:880px) { .filter-summary.is-idle { display:none; } }
+@media screen and (max-width:520px) {
+  .workspace-toolbar { flex-wrap:nowrap; gap:6px; padding:8px 10px; min-height:0; }
+  .view-switch { width:auto; flex:1 1 0; min-width:0; gap:2px; }
+  .view-switch button { flex:1 1 auto; min-width:0; padding:8px 4px; font-size:12px; white-space:nowrap; }
+  .vs-long, .fit-label { display:none; }
+  .vs-short { display:inline; }
+  /* The two-line source credit must not hide the legend's last row. */
+  .leaflet-bottom.leaflet-left .map-legend { margin-bottom:44px; }
+  .leaflet-control-attribution { font-size:10px; line-height:1.35; }
+  .workspace-toolbar .text-btn { flex:0 0 auto; margin-left:0; padding:0 8px; min-width:44px; }
+  .stat-tile__label, .presentation-mode .stat-tile__label { font-size:clamp(11px,3.1vw,12px); }
+}
+
+/* --- Legibility: nothing the reader has to read is set below 12px (phone tile labels scale 11-12px to fit) --- */
+.topbar__titles p, #visibleCount, .map-legend, .map-caption, .insight-donut span, .popup-card__badge { font-size:12px; }
+
+/* --- Map: status-coloured cluster rings and Armenian place labels --- */
+.marker-cluster-custom .cluster-ring { position:relative; display:block; border:0; border-radius:50%; box-shadow:0 3px 10px #0f1f2c47; animation:refresh-cluster .35s ease backwards; }
+.marker-cluster-custom .cluster-ring > span { position:absolute; inset:6px; display:grid; place-items:center; border-radius:50%; background:var(--surface-1); color:var(--text-primary); font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; }
+.map-label { background:transparent; border:0; pointer-events:none; }
+.map-label > span { position:absolute; transform:translate(-50%,-50%); white-space:nowrap; font-weight:600; color:#586a71; text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 7px #ffffffcc; }
+.map-label--region > span { transform:translate(-50%,calc(-100% - 5px)); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#66767c; }
+.map-label--city > span { font-size:15px; font-weight:700; color:#3f535b; }
+.map-label--lake > span { font-size:13px; font-style:italic; color:#5d86a8; }
+.map-label--community > span { font-size:12px; color:#4e636a; }
+:root[data-theme="dark"] .map-label > span { color:#b4c5ca; text-shadow:0 0 3px #0b1a21,0 0 3px #0b1a21,0 0 7px #0b1a21cc; }
+:root[data-theme="dark"] .map-label--region > span { color:#8aa0a7; }
+:root[data-theme="dark"] .map-label--city > span { color:#dbe8ea; }
+:root[data-theme="dark"] .map-label--lake > span { color:#86b0d2; }
+
+/* --- List cards: a thumbnail of the school's land parcel, and the legal form as a small tag --- */
+.school-thumb { display:grid; place-items:center; flex:0 0 auto; width:58px; height:58px; border-radius:14px; background:color-mix(in srgb,var(--thumb-color) 10%,var(--surface-1)); border:1px solid color-mix(in srgb,var(--thumb-color) 28%,transparent); }
+.school-thumb svg { width:44px; height:44px; display:block; overflow:visible; fill:color-mix(in srgb,var(--thumb-color) 28%,transparent); stroke:var(--thumb-color); stroke-width:1.6px; stroke-linejoin:round; }
+.school-thumb svg path { vector-effect:non-scaling-stroke; }
+.thumb-fallback { color:var(--thumb-color); font-size:22px; }
+.school-tag { display:inline-block; margin-left:4px; padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); font-size:12px; font-weight:600; letter-spacing:.04em; line-height:1.2; vertical-align:.12em; white-space:nowrap; }
+
+/* --- School details panel: stop long words breaking mid-word; the funder gets a full-width row --- */
+.school-details .popup-card__grid b { overflow-wrap:break-word; word-break:normal; hyphens:manual; }
+.school-details .popup-card__grid > div:nth-child(4) { grid-column:1 / -1; }
+
+@media print { .hero-strip, #menuToggle, .map-label { display:none !important; } }

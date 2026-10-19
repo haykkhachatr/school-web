@@ -34,6 +34,7 @@
       if (!document.getElementById('schoolDetails').hidden) closeDetails();
       if (root.classList.contains('presentation-mode')) togglePresentation(false);
     }
+    if (e.key === 'Escape' && topbarEl.classList.contains('menu-open')) { setMenu(false); menuToggle.focus(); }
     if (e.key === 'Escape' && sidebar.classList.contains('open')) { closeSidebar(); sidebarToggle.focus(); }
     if (e.key === 'Tab' && sidebar.classList.contains('open')) {
       const controls = [...sidebar.querySelectorAll('button, input, select')].filter(el => !el.hidden && el.getClientRects().length);
@@ -42,6 +43,30 @@
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
   });
+
+  /* ---------- Header menu (phones keep Overview / Presentation / Print behind one button) ---------- */
+  const topbarEl = document.getElementById('topbar');
+  const menuToggle = document.getElementById('menuToggle');
+  function setMenu(open) {
+    topbarEl.classList.toggle('menu-open', open);
+    menuToggle.setAttribute('aria-expanded', String(open));
+  }
+  menuToggle.addEventListener('click', () => setMenu(!topbarEl.classList.contains('menu-open')));
+  document.getElementById('topbarMenu').addEventListener('click', e => { if (e.target.closest('button')) setMenu(false); });
+  document.addEventListener('click', e => {
+    if (topbarEl.classList.contains('menu-open') && !e.target.closest('#topbarMenu, #menuToggle')) setMenu(false);
+  });
+
+  /* ---------- Welcome strip (desktop): dismissal is remembered on this device ---------- */
+  let mapReady = false;
+  function refreshMapSize() { if (mapReady) requestAnimationFrame(() => map.invalidateSize()); }
+  try { if (localStorage.getItem('heroDismissed') === '1') root.classList.add('hero-hidden'); } catch (_) {}
+  document.getElementById('heroClose').addEventListener('click', () => {
+    root.classList.add('hero-hidden');
+    try { localStorage.setItem('heroDismissed', '1'); } catch (_) {}
+    refreshMapSize();
+  });
+  document.getElementById('heroMore').addEventListener('click', () => document.getElementById('overviewToggle').click());
 
   /* ---------- Toast ---------- */
   const toastEl = document.getElementById('toast');
@@ -109,20 +134,41 @@
   const map = L.map('map', { zoomControl: false, minZoom: 6, maxZoom: 19 }).setView([40.2, 44.3], 10);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  const tileLayers = {
-    light: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19,
-    }),
-    dark: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19, className: 'dark-map-tiles',
-    }),
+  mapReady = true;
+
+  // Two basemaps per theme. Overview: a calm grey base, so the coloured school markers stand out
+  // (place names are drawn by this script, in Armenian - see "Place labels" below). Close-up, at the
+  // same zoom where school boundaries appear: OpenStreetMap, which names streets in Armenian.
+  // To go back to a single OpenStreetMap basemap, point `overview` at the same layer as `detail`.
+  const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+  const ESRI_ATTRIBUTION = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, FAO, NOAA, USGS, &copy; OpenStreetMap contributors, and the GIS User Community';
+  const esriBase = name => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${name}/MapServer/tile/{z}/{y}/{x}`, {
+    attribution: ESRI_ATTRIBUTION, maxNativeZoom: 16, maxZoom: 19,
+  });
+  const basemaps = {
+    light: {
+      overview: esriBase('World_Light_Gray_Base'),
+      detail: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: OSM_ATTRIBUTION, maxZoom: 19 }),
+    },
+    dark: {
+      overview: esriBase('World_Dark_Gray_Base'),
+      detail: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: OSM_ATTRIBUTION, maxZoom: 19, className: 'dark-map-tiles' }),
+    },
   };
+  let basemapTheme = 'light';
   let activeTileLayer = null;
-  function setTileLayer(theme) {
-    const layer = tileLayers[theme === 'dark' ? 'dark' : 'light'];
+  function syncBasemap() {
+    const set = basemaps[basemapTheme];
+    const wanted = map.getZoom() >= POLYGON_ZOOM ? set.detail : set.overview;
+    if (wanted === activeTileLayer) return;
     if (activeTileLayer) map.removeLayer(activeTileLayer);
-    layer.addTo(map);
-    activeTileLayer = layer;
+    wanted.addTo(map);
+    activeTileLayer = wanted;
+  }
+  function setTileLayer(theme) {
+    basemapTheme = theme === 'dark' ? 'dark' : 'light';
+    if (activeTileLayer) { map.removeLayer(activeTileLayer); activeTileLayer = null; }
+    syncBasemap();
     // recolor markers to match theme's status ramp
     renderMarkers(false);
     if (state.all.length) { renderList(); renderAnalysis(); if (selectedSchoolId) showDetails(selectedSchoolId, false); }
@@ -131,11 +177,25 @@
   const clusterGroup = L.markerClusterGroup({
     maxClusterRadius: 48,
     spiderfyOnMaxZoom: true,
+    // A cluster is a ring split by the status of the schools inside it, with the count in the middle.
     iconCreateFunction: function (cluster) {
-      const count = cluster.getChildCount();
-      const size = count < 10 ? 34 : count < 25 ? 42 : 50;
+      const children = cluster.getAllChildMarkers();
+      const count = children.length;
+      const size = count < 10 ? 40 : count < 25 ? 48 : 56;
+      const tally = new Map();
+      children.forEach(m => {
+        const status = STATUS_ORDER.includes(m.options.status) ? m.options.status : 'Անհայտ';
+        tally.set(status, (tally.get(status) || 0) + 1);
+      });
+      let from = 0;
+      const stops = STATUS_ORDER.filter(s => tally.get(s)).map(s => {
+        const to = from + tally.get(s) / count * 100;
+        const stop = `${statusColorRaw(s)} ${from.toFixed(2)}% ${to.toFixed(2)}%`;
+        from = to;
+        return stop;
+      });
       return L.divIcon({
-        html: `<div style="width:${size}px;height:${size}px">${count}</div>`,
+        html: `<div class="cluster-ring" style="width:${size}px;height:${size}px;background:conic-gradient(${stops.join(',')})"><span>${count}</span></div>`,
         className: 'marker-cluster-custom',
         iconSize: [size, size],
       });
@@ -153,12 +213,58 @@
   let selectedSchoolId = null;
   let detailsReturnFocus = null;
 
+  /* ---------- Place labels (Armenian) for the overview basemap ---------- */
+  // Region anchors are approximate label positions, not boundaries. Community labels are placed at the
+  // average position of that community's schools, so they only ever name places that appear in the data.
+  // The grey basemap prints each region's name in Latin letters; these anchors sit on those captions and the
+  // Armenian name is drawn just above, so the two read as one bilingual label.
+  const REGION_LABELS = [
+    ['Շիրակ', 40.72, 43.89, 'region'], ['Լոռի', 40.95, 44.55, 'region'], ['Տավուշ', 40.97, 45.15, 'region'],
+    ['Արագածոտն', 40.43, 44.11, 'region'], ['Կոտայք', 40.39, 44.67, 'region'], ['Գեղարքունիք', 40.27, 45.33, 'region'],
+    ['Արմավիր', 40.14, 43.98, 'region'], ['Արարատ', 39.96, 44.74, 'region'], ['Վայոց Ձոր', 39.77, 45.43, 'region'],
+    ['Սյունիք', 39.35, 46.1, 'region'],
+  ];
+  const placeLabels = [];
+  map.createPane('labels');
+  map.getPane('labels').style.zIndex = 450;
+  function addPlaceLabel(text, lat, lon, kind, min, max) {
+    const marker = L.marker([lat, lon], {
+      icon: L.divIcon({ className: `map-label map-label--${kind}`, html: `<span>${escapeHtml(text)}</span>`, iconSize: [0, 0] }),
+      interactive: false, keyboard: false, pane: 'labels',
+    });
+    placeLabels.push({ marker, min, max });
+  }
+  REGION_LABELS.forEach(([text, lat, lon, kind]) => addPlaceLabel(text, lat, lon, kind, 7, 9));
+  addPlaceLabel('Երևան', 40.18, 44.51, 'city', 7, 12);
+  addPlaceLabel('Սևանա լիճ', 40.5, 45.3, 'lake', 7, 11);
+  function buildCommunityLabels() {
+    const groups = new Map();
+    state.all.forEach(f => {
+      if (!f.community || f.community === 'Անհայտ' || !Number.isFinite(f.lat) || !Number.isFinite(f.lon)) return;
+      const g = groups.get(f.community) || { lat: 0, lon: 0, n: 0 };
+      g.lat += f.lat; g.lon += f.lon; g.n++;
+      groups.set(f.community, g);
+    });
+    groups.forEach((g, name) => addPlaceLabel(name, g.lat / g.n, g.lon / g.n, 'community', 10, 14));
+    syncLabels();
+  }
+  function syncLabels() {
+    const zoom = map.getZoom();
+    placeLabels.forEach(({ marker, min, max }) => {
+      const show = zoom >= min && zoom <= max;
+      if (show && !map.hasLayer(marker)) map.addLayer(marker);
+      if (!show && map.hasLayer(marker)) map.removeLayer(marker);
+    });
+  }
+
   function syncGeometryVisibility() {
     const detailed = map.getZoom() >= POLYGON_ZOOM;
     [[clusterGroup, !detailed], [polygonGroup, detailed], [fallbackGroup, detailed]].forEach(([layer, visible]) => {
       if (visible && !map.hasLayer(layer)) map.addLayer(layer);
       if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
     });
+    syncBasemap();
+    syncLabels();
   }
   map.on('zoomend', syncGeometryVisibility);
 
@@ -239,6 +345,7 @@
 
     bindEvents();
     bindWorkspace();
+    buildCommunityLabels();
     applyFilters();
 
     setTimeout(() => document.getElementById('mapLoading').classList.add('hide'), 350);
@@ -428,7 +535,7 @@
         html: `<div class="school-circle" style="--school-color:${color}"></div>`,
         iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -12],
       });
-      const marker = L.marker(position, { icon, title: f.name, alt: f.name });
+      const marker = L.marker(position, { icon, title: f.name, alt: f.name, status: f.status });
       marker.on('click', () => showDetails(id));
       markerById.set(id, marker);
       markers.push(marker);
@@ -470,7 +577,11 @@
     animateCount(document.getElementById('statTotal'), items.length);
     animateCount(document.getElementById('statStudents'), items.reduce((s, f) => s + (f.studAll || 0), 0));
     animateCount(document.getElementById('statCompleted'), completed);
-    animateCount(document.getElementById('statOngoing'), items.filter(f => f.status === 'Ընթացիկ').length);
+    const ongoing = items.filter(f => f.status === 'Ընթացիկ').length;
+    animateCount(document.getElementById('statOngoing'), ongoing);
+    // Thin bars under the two status tiles show each status's share of the selected schools.
+    document.getElementById('statCompletedBar').style.width = (items.length ? completed / items.length * 100 : 0) + '%';
+    document.getElementById('statOngoingBar').style.width = (items.length ? ongoing / items.length * 100 : 0) + '%';
     document.getElementById('completionShare').textContent = items.length ? `${fmt.format(Math.round(completed / items.length * 100))}%՝ ընտրված դպրոցներից` : 'Արդյունքներ չկան';
     document.getElementById('resultsCount').textContent = `${fmt.format(items.length)} / ${fmt.format(state.all.length)} դպրոց`;
     // The overview is a distribution, not a construction-completion percentage.
@@ -508,13 +619,17 @@
   function renderList() {
     const sort = document.getElementById('sortSchools').value;
     const items = [...state.filtered].sort((a, b) => sort === 'students' ? b.studAll - a.studAll : String(a[sort]).localeCompare(String(b[sort]), 'hy'));
-    document.getElementById('schoolList').innerHTML = items.length ? items.map(f => `
+    document.getElementById('schoolList').innerHTML = items.length ? items.map(f => {
+      const { title, tag } = splitSchoolName(f.name);
+      const color = statusColorRaw(f.status);
+      return `
       <article class="school-card">
-        <div class="school-card__top"><span class="school-symbol" aria-hidden="true">▦</span><span class="school-status" style="--badge-color:${statusColorRaw(f.status)}"><i></i>${escapeHtml(STATUS_LABELS[f.status] || f.status)}</span></div>
-        <h3>${escapeHtml(f.name)}</h3><p>${escapeHtml(f.province)} · ${escapeHtml(f.settlement)}</p>
+        <div class="school-card__top"><span class="school-thumb" style="--thumb-color:${color}" aria-hidden="true">${schoolThumb(f.fid)}</span><span class="school-status" style="--badge-color:${color}"><i></i>${escapeHtml(STATUS_LABELS[f.status] || f.status)}</span></div>
+        <h3>${escapeHtml(title)}${tag ? ` <span class="school-tag">${escapeHtml(tag)}</span>` : ''}</h3><p>${escapeHtml(f.province)} · ${escapeHtml(f.settlement)}</p>
         <div class="school-card__metrics"><span><b>${numberOrMissing(f.studAll)}</b> աշակերտ</span><span><b>${numberOrMissing(f.consArea)}</b> մ²</span></div>
         <button class="school-open" data-school="${escapeAttr(f.fid)}">Դիտել քարտեզի վրա <span aria-hidden="true">↗</span></button>
-      </article>`).join('') : '<div class="empty-state"><span aria-hidden="true">⌕</span><h3>Դպրոցներ չեն գտնվել</h3><p>Փորձեք այլ որոնում կամ զրոյացրեք զտիչները։</p><button class="action-btn" id="emptyReset">Զրոյացնել զտիչները</button></div>';
+      </article>`;
+    }).join('') : '<div class="empty-state"><span aria-hidden="true">⌕</span><h3>Դպրոցներ չեն գտնվել</h3><p>Փորձեք այլ որոնում կամ զրոյացրեք զտիչները։</p><button class="action-btn" id="emptyReset">Զրոյացնել զտիչները</button></div>';
     document.getElementById('emptyReset')?.addEventListener('click', () => document.getElementById('resetFilters').click());
   }
 
@@ -561,8 +676,48 @@
     </section>`;
   }
 
+  // A zero in this database is usually a placeholder rather than a measured value, so it is shown as a
+  // dash ("no data") instead of a real-looking 0. The raw values are unchanged in the CSV export.
   function numberOrMissing(value) {
-    return typeof value === 'number' && Number.isFinite(value) ? fmt.format(Math.round(value)) : 'Տվյալ չկա';
+    return typeof value === 'number' && Number.isFinite(value) && value > 0
+      ? fmt.format(Math.round(value))
+      : '<span class="no-data" title="Տվյալ չկա">—<span class="sr-only"> Տվյալ չկա</span></span>';
+  }
+
+  // "«…» ՊՈԱԿ" -> the legal-form suffix becomes a small tag; stray spaces and the outer « » are tidied.
+  function splitSchoolName(raw) {
+    let title = String(raw || '').replace(/\s+/g, ' ').trim();
+    let tag = '';
+    const suffix = title.match(/\s*(ՊՈԱԿ|ՀՈԱԿ)\s*$/);
+    if (suffix) { tag = suffix[1]; title = title.slice(0, suffix.index).trim(); }
+    const quoted = title.match(/^«(.*)»$/);
+    if (quoted) title = quoted[1].trim();
+    return { title, tag };
+  }
+
+  // A small outline of the school's land parcel replaces a generic icon on each list card.
+  const thumbCache = new Map();
+  function schoolThumb(id) {
+    const key = String(id);
+    if (thumbCache.has(key)) return thumbCache.get(key);
+    const geometry = geometryById.get(key);
+    const polygons = geometry && (geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.type === 'MultiPolygon' ? geometry.coordinates : null);
+    let svg = '<span class="thumb-fallback">▦</span>';
+    if (polygons && polygons.length) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      polygons.forEach(poly => poly[0].forEach(([x, y]) => {
+        minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+      }));
+      const kx = Math.cos(((minY + maxY) / 2) * Math.PI / 180); // keep the true proportions of the parcel
+      const w = (maxX - minX) * kx, h = maxY - minY;
+      const scale = 78 / Math.max(w, h, 1e-9);
+      const offX = (100 - w * scale) / 2, offY = (100 - h * scale) / 2;
+      const d = polygons.map(poly => poly.map(ring => 'M' + ring.map(([x, y]) =>
+        `${(offX + (x - minX) * kx * scale).toFixed(1)} ${(offY + (maxY - y) * scale).toFixed(1)}`).join('L') + 'Z').join('')).join('');
+      svg = `<svg viewBox="0 0 100 100" focusable="false"><path d="${d}" fill-rule="evenodd"/></svg>`;
+    }
+    thumbCache.set(key, svg);
+    return svg;
   }
 
   function filterDescription() {
@@ -588,6 +743,7 @@
     if (state.capMin !== state.capBounds[0] || state.capMax !== state.capBounds[1]) tag('range', '', `Աշակերտ՝ ${state.capMin}–${state.capMax}`);
     document.getElementById('activeFilters').innerHTML = tags.join('');
     document.getElementById('activeFilters').hidden = !tags.length;
+    document.getElementById('filterSummary').classList.toggle('is-idle', !tags.length);
   }
 
   function syncFilterControls() {
@@ -619,7 +775,7 @@
         <div><dt>Աշխատանքների տեսակ</dt><dd>${text(f.constInt)}</dd></div>
         <div><dt>Կառուցման տարեթիվ</dt><dd>${text(f.buildYear)}</dd></div>
         <div><dt>Կադաստրային ծածկագիր</dt><dd>${text(f.cadastre)}</dd></div>
-      </dl><p class="details-disclaimer">Աղբյուր՝ schools.geojson։ Զրոները ցուցադրված են ինչպես բազայում․ դրանց լրացվածությունը պետք է ստուգել աղբյուրի հետ։ Թարմացման ամսաթիվը նշված չէ։</p>`;
+      </dl><p class="details-disclaimer">Աղբյուր՝ schools.geojson։ Բազայում 0 նշված արժեքները ցուցադրվում են «—» նշանով (տվյալ չկա)․ դրանց ճշտությունը պետք է ստուգել աղբյուրի հետ։ Թարմացման ամսաթիվը նշված չէ։</p>`;
     document.getElementById('schoolDetails').hidden = false;
     const content = document.getElementById('detailsContent');
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && content.animate) {
@@ -650,6 +806,7 @@
     button.setAttribute('aria-pressed', String(enabled));
     button.textContent = enabled ? 'Ելք ներկայացումից' : 'Ներկայացման ռեժիմ';
     closeSidebar();
+    setMenu(false);
     requestAnimationFrame(() => map.invalidateSize());
   }
 
@@ -686,7 +843,7 @@
     const zeroes = items.filter(f => f.studAll === 0 || f.capacity === 0 || f.consArea === 0).length;
     const years = items.filter(f => missing(f.buildYear)).length;
     return `<article class="quality-card"><h3>Տվյալների որակ և սահմանափակումներ</h3><div class="quality-counts"><span><b>${unknown.length}</b> դպրոց՝ չնշված մարզով, համայնքով, տեսակով կամ կարգավիճակով</span><span><b>${zeroes}</b> դպրոց՝ առնվազն մեկ զրոյական թվային ցուցանիշով</span><span><b>${years}</b> դպրոց՝ չնշված կառուցման տարեթվով</span></div>
-      <p>Զրոյական արժեքները պահպանված են աղբյուրից և չեն համարվում հաստատված բացակայող տվյալ։ Թարմացման ամսաթիվ, ծրագրերի ժամկետներ և բյուջեներ բազայում չկան․ ուշացման կամ ֆինանսական ռիսկի գնահատում չի կատարվում։</p>
+      <p>Զրոյական արժեքները պահպանված են աղբյուրից և չեն համարվում հաստատված բացակայող տվյալ․ ցանկում և քարտերում դրանք ցուցադրվում են «—» նշանով։ Թարմացման ամսաթիվ, ծրագրերի ժամկետներ և բյուջեներ բազայում չկան․ ուշացման կամ ֆինանսական ռիսկի գնահատում չի կատարվում։</p>
       ${unknown.length ? `<details><summary>Տեսնել չլրացված հիմնական տվյալներով դպրոցները (${unknown.length})</summary><ul>${unknown.map(f => `<li>${escapeHtml(f.name)}</li>`).join('')}</ul></details>` : ''}</article>`;
   }
 
